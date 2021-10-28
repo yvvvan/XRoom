@@ -1,0 +1,9 @@
+Library/
+Logs/
+Temp/
+Material/
+Build/
+*.zip
+
+# eception for github page
+!docs/Build/
