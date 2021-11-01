@@ -173,7 +173,7 @@ GameObject:
   - component: {fileID: 5047269761134280926}
   - component: {fileID: 244338713641724133}
   m_Layer: 0
-  m_Name: bed
+  m_Name: Bed
   m_TagString: Draggable
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

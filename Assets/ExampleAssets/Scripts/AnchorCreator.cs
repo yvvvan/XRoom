@@ -30,18 +30,24 @@ public class AnchorCreator : MonoBehaviour
 
     // list of objects
     public GameObject[] AnchorPrefabs;
-    // current object (use to replace)
+    // index of next obj prefab
+    private int dropIndex; 
+    // current object 
     private GameObject currentObj;
-    private int dropIndex;
-    // a list of objects
+    // index of current object
+    private int itemIndex;
+    // a list of dropped objects
     private List<GameObject> m_GameObject; 
+
     // resizing original distance 
     private float fingerdistance;
+
     // double tap 
     private int TapCount;
     private float MaxDubbleTapTime;
     private float NewTime;
     private bool is_doubletap;
+
     // rotation button
     public Button rotationX;
     public Button rotationY;
@@ -51,16 +57,14 @@ public class AnchorCreator : MonoBehaviour
     private bool rotateY;
     private bool rotateZ;
     private bool isButton;
+
     // control button
     public Button previousButton;
+    public Text controlText;
     public Button deleteButton;
-    private int itemIndex;
-    private bool setPreviousClick;
-    private bool deleteCurrentClick;
-
-    private bool skip;
-    public Button image;
-
+    public Button nextButton;
+    public Text dropText;
+    
 
     // Removes all the anchors that have been created.
     public void RemoveAllAnchors()
@@ -116,32 +120,21 @@ public class AnchorCreator : MonoBehaviour
     }
 
     // control
-    void setPrevious(){
-        setPreviousClick = true;
-        TapCount = 0;
-        isButton = true;
-    }
-
-    void deleteCurrent(){
-        deleteCurrentClick = true;
-        TapCount = 0;
-        isButton = true;
-    }
-
-    public void setPrevious2(){
-        TapCount = 0;
-        isButton = true;
+    public void setPrevious(){
+        // set a already dropped previous object as current obj
         itemIndex -= 1;
         if (itemIndex < -1){
             itemIndex = m_GameObject.Count-1;
         }
-        currentObj = m_GameObject[itemIndex];
-        setPreviousClick=false;
-    }
-
-    public void deleteCurrent2(){
+        if (itemIndex >= 0 ){
+            currentObj = m_GameObject[itemIndex];
+        }
         TapCount = 0;
         isButton = true;
+    }
+
+    public void deleteCurrent(){
+        // delete the current obj
         if (m_GameObject.Count>0) {
             var a = m_AnchorPoints[itemIndex];
             var b = m_GameObject[itemIndex];
@@ -149,32 +142,59 @@ public class AnchorCreator : MonoBehaviour
             m_GameObject.RemoveAt(itemIndex);
             Destroy(a);
             Destroy(b);
-            itemIndex -= 1;
-            currentObj = m_GameObject[itemIndex];
+            if (m_GameObject.Count>=itemIndex+1){
+                // don't change index
+            }
+            else {
+                // set to the last obj
+                itemIndex = m_GameObject.Count -1;
+            }
+            if (itemIndex >= 0 ){
+                currentObj = m_GameObject[itemIndex];
+            }    
         }
-        deleteCurrentClick = false;
-    }
-
-    void imageClick(){
-        skip = true;
         TapCount = 0;
+        isButton = true;
     }
 
+    public void setNext(){
+        // set the next to-drop obj
+        dropIndex += 1;
+        if (dropIndex >= AnchorPrefabs.Length){
+            dropIndex = 0;
+        }
+        TapCount = 0;
+        isButton = true;
+    }
 
 
     // On Awake(), we obtains a reference to all the required components.
     void Awake()
     {
+        // set basic component
         m_RaycastManager = GetComponent<ARRaycastManager>();
         m_AnchorManager = GetComponent<ARAnchorManager>();
         m_PlaneManager = GetComponent<ARPlaneManager>();
+
+        // used anchors
         m_AnchorPoints = new List<ARAnchor>();
-        dropIndex = 0;
-        fingerdistance = 0;
+        // used obj
         m_GameObject = new List<GameObject>();
+
+        // which obj to drop
+        dropIndex = 0;
+        // current obj in m_GameObject list
+        itemIndex = -1;
+
+        // finger distance by resizing
+        fingerdistance = 0;
+        
+        // double tap
         is_doubletap = false;
         MaxDubbleTapTime = 0.3f;
         NewTime = Time.time;
+
+        // rotation
         rotationSpeed = 2.5f;
         rotationX.onClick.AddListener(RotationX);
         rotationY.onClick.AddListener(RotationY);
@@ -182,30 +202,33 @@ public class AnchorCreator : MonoBehaviour
         rotateX = false;
         rotateY = false;
         rotateZ = false;
+
+        // controls
         previousButton.onClick.AddListener(setPrevious);
         deleteButton.onClick.AddListener(deleteCurrent);
-        itemIndex = -1;
-        image.onClick.AddListener(imageClick);
-        setPreviousClick= false;
-        deleteCurrentClick= false;
-        skip= false;
+        nextButton.onClick.AddListener(setNext);
+
         isButton = false;
     }
 
-
     void Update()
     {
-        if (setPreviousClick){setPrevious2();}
-        if (deleteCurrentClick){deleteCurrent2();}
+        if(currentObj==null){
+            controlText.text = "null";
+        } else {
+            controlText.text = currentObj.name;
+        }
+        dropText.text = AnchorPrefabs[dropIndex].name;
+
+        if (Time.time > NewTime) {
+            TapCount = 0;
+            is_doubletap = false;
+            fingerdistance = 0;
+        }
         
+        // if rotation, only rotation
         if (Rotation() || isButton){
             isButton = false;
-            return;
-        }
-
-        if(skip){
-            skip=false;
-            TapCount = 0;
             return;
         }
 
@@ -214,11 +237,19 @@ public class AnchorCreator : MonoBehaviour
              return;
         }
 
+        // tap in the untouchable area
         var touch = Input.GetTouch(0);
+        // Debug.Log(touch.position);
+        // if (touch.position.x < 200 ){
+        //     Debug.Log("in");
+        //     return;
+        // }
+            
        
-        // three-fingers-tap: delete
+        // three-fingers-tap: reset
         if (Input.touchCount > 2) {
             RemoveAllAnchors();
+            Awake();
         }
 
         // two-finger-tap: resizing
@@ -267,11 +298,11 @@ public class AnchorCreator : MonoBehaviour
                     // with the anchor, since an anchor attached to an ARPlane will be updated automatically by the ARAnchorManager as the ARPlane's exact position is refined.
                     var anchor = m_AnchorManager.AttachAnchor(hitPlane, hitPose);
                     currentObj = Instantiate(AnchorPrefabs[dropIndex], anchor.transform);
+                    
                     dropIndex += 1;
                     if (dropIndex == AnchorPrefabs.Length){
                         dropIndex =0;
                     }
-
                     if (anchor == null)
                     {
                         Debug.Log("Error creating anchor.");
@@ -279,19 +310,15 @@ public class AnchorCreator : MonoBehaviour
                     else
                     {
                         // Stores the anchor so that it may be removed later.
-                        itemIndex += 1;
                         m_AnchorPoints.Add(anchor);
                         m_GameObject.Add(currentObj);
+                        itemIndex = m_AnchorPoints.Count -1 ;
                     }
                 }
             }
         }
-
-        if (Time.time > NewTime) {
-            TapCount = 0;
-            is_doubletap = false;
-            fingerdistance = 0;
-        }
+        
+        
         // if (m_GameObject.Count > AnchorPrefabs.Length){
         //     var a = m_AnchorPoints[0];
         //     var b = m_GameObject[0];
